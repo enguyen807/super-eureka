@@ -3,7 +3,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { parentPort, threadId } from 'node:worker_threads';
-import { defineEventHandler, handleCacheHeaders, splitCookiesString, isEvent, createEvent, getRequestHeader, eventHandler, setHeaders, sendRedirect, proxyRequest, setResponseHeader, send, getResponseStatus, setResponseStatus, setResponseHeaders, getRequestHeaders, createApp, createRouter as createRouter$1, toNodeListener, fetchWithEvent, lazyEventHandler, getQuery as getQuery$1, createError, getResponseStatusText } from 'file:///app/node_modules/h3/dist/index.mjs';
+import { defineEventHandler, handleCacheHeaders, splitCookiesString, isEvent, createEvent, getRequestHeader, eventHandler, setHeaders, sendRedirect, proxyRequest, setResponseHeader, send, getResponseStatus, setResponseStatus, setResponseHeaders, getRequestHeaders, createApp, createRouter as createRouter$1, toNodeListener, fetchWithEvent, lazyEventHandler, getCookie, createError, getQuery as getQuery$1, getResponseStatusText } from 'file:///app/node_modules/h3/dist/index.mjs';
+import { createClient } from 'file:///app/node_modules/@supabase/supabase-js/dist/main/index.js';
+import defu, { defuFn, defu as defu$1 } from 'file:///app/node_modules/defu/dist/defu.mjs';
 import { getRequestDependencies, getPreloadLinks, getPrefetchLinks, createRenderer } from 'file:///app/node_modules/vue-bundle-renderer/dist/runtime.mjs';
 import { stringify, uneval } from 'file:///app/node_modules/devalue/index.js';
 import { renderToString } from 'file:///app/node_modules/vue/server-renderer/index.mjs';
@@ -14,7 +16,6 @@ import { createCall, createFetch } from 'file:///app/node_modules/unenv/runtime/
 import { createHooks } from 'file:///app/node_modules/hookable/dist/index.mjs';
 import { snakeCase } from 'file:///app/node_modules/scule/dist/index.mjs';
 import { klona } from 'file:///app/node_modules/klona/dist/index.mjs';
-import defu, { defuFn } from 'file:///app/node_modules/defu/dist/defu.mjs';
 import { hash } from 'file:///app/node_modules/ohash/dist/index.mjs';
 import { parseURL, withoutBase, joinURL, getQuery, withQuery } from 'file:///app/node_modules/ufo/dist/index.mjs';
 import { createStorage, prefixStorage } from 'file:///app/node_modules/unstorage/dist/index.mjs';
@@ -60,7 +61,35 @@ const _inlineRuntimeConfig = {
       }
     }
   },
-  "public": {}
+  "public": {
+    "supabase": {
+      "url": "https://qsxwhsfwwcjalrezamih.supabase.co",
+      "key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzeHdoc2Z3d2NqYWxyZXphbWloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDA1NzM0OTcsImV4cCI6MjAxNjE0OTQ5N30.nnwMAVKr9CugSM-u0Gon6JKBCV_R0KHnaErTI8tseFw",
+      "redirect": false,
+      "redirectOptions": {
+        "login": "/login",
+        "callback": "/confirm",
+        "exclude": []
+      },
+      "cookieName": "sb",
+      "cookieOptions": {
+        "maxAge": 28800,
+        "sameSite": "lax",
+        "secure": true
+      },
+      "clientOptions": {
+        "auth": {
+          "flowType": "pkce",
+          "detectSessionInUrl": true,
+          "persistSession": true,
+          "autoRefreshToken": true
+        }
+      }
+    }
+  },
+  "supabase": {
+    "serviceKey": ""
+  }
 };
 const ENV_PREFIX = "NITRO_";
 const ENV_PREFIX_ALT = _inlineRuntimeConfig.nitro.envPrefix ?? process.env.NITRO_ENV_PREFIX ?? "_";
@@ -665,9 +694,11 @@ const errorHandler = (async function errorhandler(error, event) {
   return send(event, html);
 });
 
+const _lazy_9miSKO = () => Promise.resolve().then(function () { return index_get$1; });
 const _lazy_1AROdB = () => Promise.resolve().then(function () { return renderer$1; });
 
 const handlers = [
+  { route: '/api/words/ee', handler: _lazy_9miSKO, lazy: true, middleware: false, method: "get" },
   { route: '/__nuxt_error', handler: _lazy_1AROdB, lazy: true, middleware: false, method: undefined },
   { route: '/**', handler: _lazy_1AROdB, lazy: true, middleware: false, method: undefined }
 ];
@@ -853,6 +884,62 @@ const errorDev = /*#__PURE__*/Object.freeze({
   template: template$1
 });
 
+function buildAssetsDir() {
+  return useRuntimeConfig().app.buildAssetsDir;
+}
+function buildAssetsURL(...path) {
+  return joinURL(publicAssetsURL(), buildAssetsDir(), ...path);
+}
+function publicAssetsURL(...path) {
+  const publicBase = useRuntimeConfig().app.cdnURL || useRuntimeConfig().app.baseURL;
+  return path.length ? joinURL(publicBase, ...path) : publicBase;
+}
+
+const serverSupabaseClient = async (event) => {
+  const {
+    supabase: { url, key, cookieName, clientOptions }
+  } = useRuntimeConfig().public;
+  let supabaseClient = event.context._supabaseClient;
+  if (!supabaseClient) {
+    const options = defu$1({
+      auth: {
+        detectSessionInUrl: false,
+        persistSession: false,
+        autoRefreshToken: false
+      }
+    }, clientOptions);
+    supabaseClient = createClient(url, key, options);
+    event.context._supabaseClient = supabaseClient;
+  }
+  const { data } = await supabaseClient.auth.getSession();
+  if (data?.session?.user?.aud !== "authenticated") {
+    const accessToken = getCookie(event, `${cookieName}-access-token`);
+    const refreshToken = getCookie(event, `${cookieName}-refresh-token`);
+    if (!accessToken || !refreshToken) {
+      return supabaseClient;
+    }
+    await supabaseClient.auth.setSession({
+      refresh_token: refreshToken,
+      access_token: accessToken
+    });
+  }
+  return supabaseClient;
+};
+
+const index_get = defineEventHandler(async (event) => {
+  const client = await serverSupabaseClient(event);
+  const { data, error } = await client.from("random_eesti_words").select("eesti_name, grammar");
+  if (error) {
+    throw createError({ statusMessage: error.message });
+  }
+  return data;
+});
+
+const index_get$1 = /*#__PURE__*/Object.freeze({
+  __proto__: null,
+  default: index_get
+});
+
 const Vue3 = version.startsWith("3");
 
 function resolveUnref(r) {
@@ -914,17 +1001,6 @@ const appHead = {"meta":[{"name":"viewport","content":"width=device-width, initi
 const appRootId = "__nuxt";
 
 const appRootTag = "div";
-
-function buildAssetsDir() {
-  return useRuntimeConfig().app.buildAssetsDir;
-}
-function buildAssetsURL(...path) {
-  return joinURL(publicAssetsURL(), buildAssetsDir(), ...path);
-}
-function publicAssetsURL(...path) {
-  const publicBase = useRuntimeConfig().app.cdnURL || useRuntimeConfig().app.baseURL;
-  return path.length ? joinURL(publicBase, ...path) : publicBase;
-}
 
 globalThis.__buildAssetsURL = buildAssetsURL;
 globalThis.__publicAssetsURL = publicAssetsURL;
