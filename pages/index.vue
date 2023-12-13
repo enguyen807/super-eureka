@@ -5,7 +5,24 @@
 
 // console.log(data);
 
-const data = ref(
+interface SetWord {
+  (row: number, start: number, end: number, word: string): void
+}
+
+interface Word {
+  eesti_name: string,
+  grammar: string
+}
+
+interface WordList {
+  text: string, 
+  start: number[], 
+  end: number[], 
+  isVertical: boolean
+}
+
+
+const data = ref<Word[]>(
   [
     {
         "eesti_name": "jooksma",
@@ -30,26 +47,25 @@ const data = ref(
 ]
 )
 
-const matrix = ref(Array(10).fill().map(()=>Array(10).fill()));
+const matrix = ref(Array(10).fill('').map(()=>Array(10).fill('-')));
 
-const setHorizontalWord = (row: number, start: number, end: number, word: string): void => {
+const setHorizontalWord: SetWord = (row, start, end, word) => {
   let i = 0;
-  for (let index = start; index <= end; index++) {
+  for (let index = start; index < end; index++) {
       matrix.value[row][index] = word.charAt(i).toLocaleUpperCase();
       i++
   }
 }
 
-const setVerticalWord = (col: number, start: number, end: number, word: string): void => {
+const setVerticalWord: SetWord = (col, start, end, word) => {
   let i = 0;
-  for (let index = start; index <= end; index++) {
-      console.log(index, col)
+  for (let index = start; index < end; index++) {
       matrix.value[index][col] = word.charAt(i).toUpperCase();
       i++
   }
 }
 
-const generateWordList = computed(() => {
+const generateWordList = computed<WordList[]>(() => {
   return data.value.map((word) => {
     const isVertical = Math.random() >= 0.5;
     const text = word.eesti_name;
@@ -84,7 +100,7 @@ onMounted(() => {
       <tbody>
         <tr v-for="(rows, rowIndex) in matrix" :id="`row_${rowIndex}`">
           <td v-for="(cell, cellIndex) in rows" :id="`r${rowIndex}_c${cellIndex}`" style="padding: 15px 20px;">
-            {{cell || '-'}}
+            {{cell}}
           </td>
         </tr>
     </tbody>
