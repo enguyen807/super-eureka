@@ -4,7 +4,9 @@ export default defineNuxtConfig({
   modules: ['@nuxtjs/supabase'],
   css: ['/assets/main.css'],
   supabase: {
-    redirect: false
+    redirect: false,
+    url: process.env.SUPABASE_URL,
+    key: process.env.SUPABASE_KEY,
   },
   typescript: {
     shim: false

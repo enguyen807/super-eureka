@@ -1,0 +1,24 @@
+TODO
+ * Check for overlaps ( Check if matrices align together)
+ * Check if row/column are parallel to another row/column
+    * (alt) just add + 1 to either row or column so that they are never parallel touching
+ * handle intersections
+    * set first word
+    * find random char from first word that exists in other words (returned filter array)
+    * find word in returned array that doesn't exceed puzzle boundary
+        * if first word = horizontal:
+            - char in second word must match [col, row] of char in first word [col will be constant here]
+            - calculate number of char needed before matching char and after = [rowStart, rowEnd]
+            - roadblock: if word exceed grid what to do?
+        * if first word = vertical:
+            - char in second word must match [col, row] of char in first word [row will be constant here]
+            - calculate number of char needed before matching char and after = [colStart, colEnd]
+    
+
+c-r (intersects)
+[0,1][5,1]
+[2,1][6,1]
+
+c-r (not intersects)
+[0,1][5,1]
+[7,1][9,1]

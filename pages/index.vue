@@ -3,7 +3,6 @@
 //   headers: useRequestHeaders(["cookie"]),
 // });
 
-// console.log(data);
 
 interface SetWord {
   (row: number, start: number, end: number, word: string): void
@@ -21,6 +20,14 @@ interface WordList {
   isVertical: boolean
 }
 
+interface Result {
+  text: string, 
+  start: number[], 
+  end: number[], 
+  alignment: number, 
+  isVertical: boolean
+}
+
 // const isVertical = ref<boolean>(false);
 const data = ref<Word[]>(
   [
@@ -29,22 +36,21 @@ const data = ref<Word[]>(
       "grammar": "verb"
     },
     {
-      "eesti_name": "tulema",
-      "grammar": "verb"
-    },
-    {
       "eesti_name": "kasutama",
       "grammar": "verb"
     },
-
+    {
+      "eesti_name": "tulema",
+      "grammar": "verb"
+    },
     // {
     //   "eesti_name": "xyz",
     //   "grammar": "verb"
     // }
-    // {
-    //     "eesti_name": "olema",
-    //     "grammar": "verb"
-    // },
+    {
+        "eesti_name": "olema",
+        "grammar": "verb"
+    },
     // {
     //     "eesti_name": "otsima",
     //     "grammar": "verb"
@@ -70,124 +76,89 @@ const setVerticalWord: SetWord = (col, start, end, word) => {
   }
 }
 
-const handleWordPlacement = (wordList: WordList[], isVertical: boolean, text: string): { start: number, end: number, alignment: number } => {
-  let start = Math.round(Math.random() * ((10 - text.length) - 0) + 0);
-  let end = start + text.length;
-  let alignment = Math.round(Math.random() * (7 - 2) + 2);
+const handleWordPlacement = (wordList: string[]): Result[] => {
+  let result: Result[] = [];
+  let i = wordList.length;
+  let prevWord: Result | null = null;
 
-  if (!wordList.length) {
-    //Math.round(Math.random() * (7 - 2) + 2)
-    // hardcode 5 will handle what happens if word overflows grid 
+  while (i--) {
+    // console.log(i)
+    // set initial position of first word
+    if (!result.length) {
+      const currentWord = wordList[i].toLowerCase();
+      const start = Math.floor(Math.random() * ((10 - currentWord.length) - 0) + 0);
+      const end = start + currentWord.length;
+      const isVertical = false;
+      const alignment = Math.floor(Math.random() * (7 - 2) + 2);
 
-    return {
-      start,
-      end,
-      alignment
+      const word: Result = {
+        text: currentWord,
+        start: isVertical ? [start, alignment] : [alignment, start],
+        end: isVertical ? [end, alignment] : [alignment, end],
+        alignment,
+        isVertical
+      }
+
+      result.push(word);
+      prevWord = word;
+
+      wordList.splice(i, 1)
+      continue;
     }
-  }
-  const prev = wordList[wordList.length - 1];
 
-  if (isVertical) {
-    //check if char in current word exists in prev word
-    const foundChars = text.split('').map(val => prev.text.indexOf(val)).filter(val => val >= 0);
-    // console.log(foundChars);
+    const currentWord = wordList[i].toLowerCase();
+
+    const otherWords = result.map(val => val.text);
+
+    const getWordWithMatchingLetter = otherWords.filter((otherWord) =>
+      currentWord.split('').some((letter) => otherWord.toLowerCase().includes(letter))
+    );
+
+    const matchedWord = getWordWithMatchingLetter.at(-1);
+    if (!matchedWord) {
+      console.log('no matching word')
+      continue;
+    }
+
+    //check if letter in current word exists in prev word
+    const foundChars = currentWord.split('').map(val => matchedWord.indexOf(val)).filter(val => val >= 0);
     const randomIndex = Math.floor(Math.random() * foundChars.length);
+    const similarLetter = prevWord!.text.split('')[foundChars[randomIndex]];
 
-    const similarLetter = prev.text.split('')[foundChars[randomIndex]]
-    // console.log(similarLetter)
-
-
-    start = prev.start[0] - text.indexOf(similarLetter);
-    end = start + text.length;
-    alignment = prev.start[1] + foundChars[randomIndex];
-    // console.log(alignment)
-
-
-    return {
-      start,
-      end,
-      alignment
-    }
-  }
-
-  // console.log(prev)
-  const foundChars = text.split('').map(val => prev.text.indexOf(val)).filter(val => val >= 0);
-  const randomIndex = Math.floor(Math.random() * foundChars.length);
-  console.log(foundChars);
-  const similarLetter = prev.text.split('')[foundChars[randomIndex]]
-  console.log(similarLetter)
-
-  start = prev.start[1] - text.indexOf(similarLetter);
-  end = start + text.length;
-  alignment = prev.start[0] + foundChars[randomIndex]
-
-  return {
-    start,
-    end,
-    alignment: alignment,
-  }
-}
-
-const handleWrdPlacement = (
-  words: string[], index = 0, result: { text: string, start: number[], end: number[], alignment: number, isVertical: boolean }[] = []): 
-  { text: string, start: number[], end: number[], alignment: number, isVertical: boolean }[] => {
-  if (index === words.length) {
-    return result
-  }
-
-  // Set initial placement of first word
-  if (!result.length) {
-    const currentWord = words[index].toLowerCase();
-    const start = Math.floor(Math.random() * ((10 - currentWord.length) - 0) + 0);
+    const isVertical = prevWord!.isVertical ? false : true;
+    const start = (prevWord!.start[isVertical ? 0 : 1] - currentWord.indexOf(similarLetter));
     const end = start + currentWord.length;
-    const isVertical = false;
-    const alignment = Math.floor(Math.random() * (7 - 2) + 2);
 
-    result.push({
+    if (start < 0 || start > 14 || end < 0 || end > 14) {
+      // end loop
+      break;
+    }
+
+    const alignment = prevWord!.start[isVertical ? 1 : 0] + foundChars[randomIndex];
+
+    const word: Result = {
       text: currentWord,
       start: isVertical ? [start, alignment] : [alignment, start],
       end: isVertical ? [end, alignment] : [alignment, end],
       alignment,
       isVertical
-    });
+    }
 
-    return handleWrdPlacement(words, index + 1, result)
+    result.push(word);
+    prevWord = word;
+    wordList.splice(i, 1);
+  }
+  // console.log(result);
+
+  return result;
+}
+
+const checkForValidGrid = (wordList: string[], grid: Result[] = []): Result[] => {
+  if (grid.length === wordList.length) {
+    return grid
   }
 
-  const currentWord = result.length ? result[index - 1].text : words[index].toLowerCase();
-  const otherWords = words.slice(0, index).concat(words.slice(index + 1));
-  console.log(otherWords)
-
-  const hasMatchingLetter = otherWords.filter((otherWord) =>
-    currentWord.split('').some((letter) => otherWord.toLowerCase().includes(letter))
-  );
-
-  if (hasMatchingLetter) {
-    const matchedWord = hasMatchingLetter[hasMatchingLetter.length - 1];
-    const prevWord = currentWord;
-    
-    //check if letter in current word exists in prev word
-    const foundChars = matchedWord.split('').map(val => prevWord.indexOf(val)).filter(val => val >= 0);
-    const randomIndex = Math.floor(Math.random() * foundChars.length);
-    const similarLetter = prevWord.split('')[foundChars[randomIndex]];
-
-    const isVertical = result[index - 1].isVertical ? false : true;
-    const start = result[index - 1].start[isVertical ? 0 : 1] - matchedWord.indexOf(similarLetter);
-    const end = start + matchedWord.length;
-    const alignment = result[index - 1].start[isVertical ? 1 : 0] + foundChars[randomIndex];
-
-    // console.log(start);
-    result.push({
-      text: matchedWord,
-      start: isVertical ? [start, alignment] : [alignment, start],
-      end: isVertical ? [end, alignment] : [alignment, end],
-      alignment,
-      isVertical
-    });
-  }
-
-  return handleWrdPlacement(words, index + 1, result)
-
+  return checkForValidGrid(wordList, handleWordPlacement(wordList));
 }
 
 const checkForCompatibleWords = (words: string[], index = 0, result: string[] = []): string[] => {
@@ -209,28 +180,16 @@ const checkForCompatibleWords = (words: string[], index = 0, result: string[] = 
   return checkForCompatibleWords(words, index + 1, result);
 }
 
-const generateWordList = computed<WordList[]>(() => {
-  // const wordList: WordList[] = [];
+const setup = () => {
+  const words = data.value.map(word => word.eesti_name).sort((a, b) => b.length - a.length);
+  console.log(words);
+  return checkForValidGrid(
+    checkForCompatibleWords(words), 
+    handleWordPlacement(checkForCompatibleWords(words))
+  );
+}
 
-  return handleWrdPlacement(checkForCompatibleWords(data.value.map(word => word.eesti_name)));
-  // console.log(test);
-  
-  // checkForCompatibleWords(data.value.map(word => word.eesti_name))
-  //   .forEach((word, index) => {
-  //     const { start, end, alignment } = handleWordPlacement(wordList, isVertical.value, word);
-
-  //     wordList.push({
-  //       text: word,
-  //       start: isVertical.value ? [start, alignment] : [alignment, start],
-  //       end: isVertical.value ? [end, alignment] : [alignment, end],
-  //       isVertical: isVertical.value
-  //     })
-  //     // basically set every other word as vertical
-  //     isVertical.value = !isVertical.value
-  //   })
-  // console.log(wordList);
-  // return test;
-})
+const generateWordList = computed<WordList[]>(() => setup())
 
 onMounted(() => {
   generateWordList.value.forEach(word => {
